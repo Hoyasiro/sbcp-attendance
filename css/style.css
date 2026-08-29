@@ -227,3 +227,84 @@ body::after { content:''; position:fixed; bottom:-150px; left:-150px; width:450p
 .undo-btn { background:var(--pink); color:var(--white); border:none; border-radius:12px; padding:10px 20px; font-size:14px; font-weight:700; font-family:'Noto Sans KR',sans-serif; cursor:pointer; white-space:nowrap; }
 .undo-btn:hover { background:#c0157a; }
 .undo-timer { position:absolute; bottom:0; left:0; height:4px; background:var(--yellow); transition:width linear; }
+
+/* ================= 모바일 (768px 이하) ================= */
+@media (max-width: 768px) {
+
+  /* 세로 배치 + 스크롤 허용 */
+  body { height:auto; min-height:100vh; overflow-y:auto; display:block; }
+  #app { flex-direction:column; height:auto; min-height:100vh; }
+
+  /* 본문 스크롤 차단 해제 (마지막 80px은 탭바 자리) */
+  .main-content { overflow:visible; padding:20px 16px 80px; }
+  .screen { height:auto; }
+
+  /* 사이드바 → 하단 고정 탭바 */
+  .sidebar {
+    position:fixed; bottom:0; left:0; right:0;
+    width:100%; height:64px;
+    flex-direction:row; padding:0;
+    border-right:none; border-top:1px solid rgba(235,49,146,.15);
+    box-shadow:0 -4px 24px rgba(235,49,146,.08);
+  }
+
+  /* 탭바에는 공간이 없으므로 숨김 */
+  .side-brand, .side-footer { display:none; }
+
+  /* 메뉴를 가로로 4등분 */
+  .side-menu { flex-direction:row; gap:0; padding:0; width:100%; }
+  .side-item {
+    flex:1; flex-direction:column; gap:4px;
+    padding:8px 4px; border-radius:0;
+    justify-content:center; text-align:center;
+    font-size:11px;
+  }
+  .side-item svg { width:22px; height:22px; }
+
+    /* ---- 홈: 2열 그리드 → 1열 ---- */
+  .home-grid { grid-template-columns:1fr; grid-template-rows:auto; height:auto; overflow:visible; gap:16px; }
+  .list-container { overflow:visible; }
+  .list-scroll { overflow:visible; padding-right:0; }
+
+  /* ---- 홈: 입력 영역 가로 → 세로 ---- */
+  .input-area { flex-direction:column; gap:24px; padding:55px 20px; }
+  .input-left { flex-direction:column; text-align:center; gap:14px; }
+  .attend-icon { width:64px; height:64px; font-size:28px; }
+  .attend-text h3 { font-size:20px; }
+  .num-input { width:100%; max-width:280px; font-size:64px; letter-spacing:16px; }
+  .num-input::placeholder { letter-spacing:16px; }
+  .result-wrapper { width:100%; height:auto; justify-content:center; }
+  .attend-text h3 { font-size:24px; }
+  .attend-text p { font-size:15px; }
+  .input-hint { font-size:14px; }
+
+  /* ---- 페이지 헤더: 제목과 날짜 세로로 ---- */
+  .page-header { flex-direction:column; align-items:flex-start; gap:12px; }
+  .page-title { font-size:24px; }
+
+  /* ---- 학생 관리 ---- */
+  .content-card { padding:20px 16px; overflow:visible; }
+  .stu-scroll { overflow:visible; padding-right:0; }
+  .stu-grid { grid-template-columns:1fr; }
+  .stu-header-actions { flex-direction:column; align-items:stretch; gap:12px; }
+  .add-btn { width:100%; }
+
+  /* ---- 데이터 관리: 2열 → 1열 ---- */
+  .data-grid { grid-template-columns:1fr; gap:16px; }
+  .data-section { padding:18px 16px; }
+
+  /* ---- 설정 ---- */
+  .save-btn { width:100%; }
+
+    /* ---- 리스트 헤더: 제목과 통계를 세로로 분리 ---- */
+  .list-header { flex-direction:column; align-items:flex-start; gap:12px; }
+  .list-title { font-size:17px; white-space:nowrap; }
+  .stat-pills { flex-wrap:wrap; margin-bottom:0; }
+
+    /* ---- 데이터 관리: 섹션 제목 한 줄 유지 ---- */
+  .data-section-title { font-size:15px; }
+
+    /* ---- 데이터 관리: 업로드 박스 여백 축소 ---- */
+  .upload-box { padding:24px 12px; }
+  .upload-hint { font-size:11px; }
+}
