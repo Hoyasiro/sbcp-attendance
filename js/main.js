@@ -3,13 +3,14 @@ var APP_VERSION = 'Acad-atd-03_1.4 (Desktop)';
 var STORAGE_KEY = 'acad-atd-03_1.4';
 
 var DEF_SETTINGS = { academyName:'삼성영어 셀레나', phone:'' };
-var DB = {students:[], attendance:{}, stats:{}, settings: Object.assign({}, DEF_SETTINGS)};
+var DB = {students:[], attendance:{}, stats:{}, holidays:[], settings: Object.assign({}, DEF_SETTINGS)};
 
 try { 
   // 기존 1.3 버전 키 호환 가능성 열어두기 (1.3 데이터가 있으면 가져옴)
   var _s=localStorage.getItem(STORAGE_KEY) || localStorage.getItem('acad-atd-03_1.3'); 
-  if(_s) DB=Object.assign({students:[],attendance:{},stats:{},settings:Object.assign({},DEF_SETTINGS)}, JSON.parse(_s)); 
+  if(_s) DB=Object.assign({students:[],attendance:{},stats:{},holidays:[],settings:Object.assign({},DEF_SETTINGS)}, JSON.parse(_s)); 
 } catch(e){}
+if(!DB.holidays) DB.holidays = [];   // 기존 저장 데이터에는 holidays가 없으므로 보정
 function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(e){} }
 
 if(!DB.students.length){
@@ -536,6 +537,7 @@ function loadSettings(){
   document.getElementById('cfgPhone').value=s.phone||'';
   var vText = document.getElementById('appVersionText');
   if(vText) vText.textContent = APP_VERSION;
+  renderHolidays();
 }
 function saveSettings(){
   DB.settings.academyName=document.getElementById('cfgName').value.trim()||'학원';
@@ -582,3 +584,96 @@ function triggerUndo(){
   }
   hideUndoToast();
 }
+
+// ===== 대한민국 양력 공휴일 =====
+// 매년 날짜가 고정된 공휴일만 자동 생성한다.
+// 설날·추석·부처님오신날은 음력이라 계산이 복잡하고,
+// 대체공휴일·임시공휴일은 정부 발표 전에는 알 수 없으므로
+// 원장이 직접 추가하도록 한다.
+
+var FIXED_HOLIDAYS = [
+  {md:'01-01', name:'신정'},
+  {md:'03-01', name:'삼일절'},
+  {md:'05-05', name:'어린이날'},
+  {md:'06-06', name:'현충일'},
+  {md:'08-15', name:'광복절'},
+  {md:'10-03', name:'개천절'},
+  {md:'10-09', name:'한글날'},
+  {md:'12-25', name:'성탄절'}
+];
+
+function addFixedHolidays(){
+  var year = new Date().getFullYear();
+  var added = 0;
+  FIXED_HOLIDAYS.forEach(function(h){
+    var d = year + '-' + h.md;
+    if(!isHoliday(d)){
+      DB.holidays.push(d);
+      added++;
+    }
+  });
+  save();
+  renderHolidays();
+  if(added > 0) showToast('✅ ' + year + '년 공휴일 ' + added + '일이 추가되었습니다.');
+  else showToast('이미 모두 등록되어 있습니다.');
+}
+
+// ===== 휴원일 관리 =====
+// 휴원일은 출석률 계산의 분모에서 제외된다.
+// 주말은 isWeekend()로 판별하고, 공휴일·자체휴강은 원장이 직접 등록한다.
+
+function isHoliday(dateStr){
+  return DB.holidays.indexOf(dateStr) > -1;
+}
+
+function renderHolidays(){
+  var box = document.getElementById('holidayList');
+  if(!box) return;
+  if(!DB.holidays.length){
+    box.innerHTML = '<div class="holiday-empty">등록된 휴원일이 없습니다.</div>';
+    return;
+  }
+  var sorted = [].concat(DB.holidays).sort();
+  box.innerHTML = sorted.map(function(d){
+    return '<span class="holiday-chip">' + d
+      + '<button data-date="' + d + '">✕</button></span>';
+  }).join('');
+}
+
+function addHoliday(){
+  var input = document.getElementById('holidayInput');
+  var d = input.value;
+  if(!d){ showToast('날짜를 선택해 주세요.'); return; }
+  if(isHoliday(d)){ showToast('이미 등록된 날짜입니다.'); return; }
+  DB.holidays.push(d);
+  save();
+  renderHolidays();
+  input.value = '';
+  showToast('✅ ' + d + ' 휴원일로 등록되었습니다.');
+}
+
+function removeHoliday(dateStr){
+  DB.holidays = DB.holidays.filter(function(d){ return d !== dateStr; });
+  save();
+  renderHolidays();
+  showToast('휴원일에서 제외되었습니다.');
+}
+
+// 이벤트 연결 (인라인 onclick 대신 addEventListener 사용)
+document.addEventListener('DOMContentLoaded', function(){
+  var addBtn = document.getElementById('holidayAddBtn');
+  if(addBtn) addBtn.addEventListener('click', addHoliday);
+
+  var fixedBtn = document.getElementById('holidayFixedBtn');
+  if(fixedBtn) fixedBtn.addEventListener('click', addFixedHolidays);
+
+  // 삭제 버튼은 목록이 다시 그려질 때마다 새로 생기므로
+  // 부모 요소에 한 번만 걸고 클릭 대상을 확인하는 방식으로 처리한다
+  var list = document.getElementById('holidayList');
+  if(list){
+    list.addEventListener('click', function(e){
+      var d = e.target.getAttribute('data-date');
+      if(d) removeHoliday(d);
+    });
+  }
+});

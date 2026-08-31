@@ -186,6 +186,21 @@
           </div>
         </div>
         
+        <div class="set-group" style="width:100%; max-width:500px;">
+          <div class="set-title">📅 휴원일 관리</div>
+          <p class="holiday-desc">
+            공휴일·자체 휴강일을 등록하면 출석률 계산에서 제외됩니다.
+          </p>
+          <div class="holiday-add">
+            <input type="date" id="holidayInput">
+            <button class="holiday-btn" id="holidayAddBtn">추가</button>
+          </div>
+          <button class="holiday-fixed-btn" id="holidayFixedBtn">
+            올해 공휴일 한 번에 등록
+          </button>
+          <div class="holiday-list" id="holidayList"></div>
+        </div>
+        
         <button class="save-btn" onclick="saveSettings()">설정 저장</button>
 
         <div class="app-version-box" id="appVersionBox">
