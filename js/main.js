@@ -677,3 +677,82 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 });
+
+// ===== 주간 출결 집계 =====
+// S1 판정 기준 정의서(A~F)를 코드로 옮긴 부분.
+// 여기서 계산한 결과를 AI에게 재료로 넘긴다. 판정은 AI가 하지 않는다.
+
+// 기준일이 속한 주의 월요일을 구한다
+function weekStart(baseDate){
+  var d = new Date((baseDate || today()) + 'T00:00:00');
+  var day = d.getDay();              // 0=일 1=월 ... 6=토
+  var diff = (day === 0) ? -6 : 1 - day;   // 일요일이면 지난 월요일로
+  d.setDate(d.getDate() + diff);
+  return fmtDate(d);
+}
+
+// 월~금 중 실제 운영하는 날짜만 배열로 반환 (주말·휴원일 제외)
+function weekDays(monday){
+  var days = [];
+  var d = new Date(monday + 'T00:00:00');
+  for(var i = 0; i < 5; i++){
+    var ds = fmtDate(d);
+    if(!isWeekend(ds) && !isHoliday(ds)) days.push(ds);
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
+// 출석률로 등급을 판정한다 (S1 정의서 B·E)
+function gradeOf(rate){
+  if(rate >= 100) return '최고';
+  if(rate >= 80)  return '양호';
+  if(rate >= 60)  return '보통';
+  return '주의';
+}
+
+// 한 학생의 주간 출결을 집계한다
+function weeklyStats(sid, baseDate){
+  var monday = weekStart(baseDate);
+  var days = weekDays(monday);
+  var s = DB.students.find(function(x){ return x.id === sid; });
+
+  var present = 0;      // 출석 일수
+  var minutes = [];     // 날짜별 체류 시간(분)
+  var noCheckout = 0;   // 하원 미체크 횟수
+
+  days.forEach(function(d){
+    var rec = DB.attendance[d] && DB.attendance[d][sid];
+    if(rec && rec.inTime){
+      present++;
+      if(rec.outTime){
+        minutes.push(timeDiffMinutes(rec.inTime, rec.outTime));
+      } else {
+        minutes.push(0);   // 하원 미체크는 0분 (S1 결정 D-4)
+        noCheckout++;
+      }
+    }
+  });
+
+  var total = days.length;
+  var rate = total ? Math.round(present / total * 100) : 0;
+  var avgMin = minutes.length
+    ? Math.round(minutes.reduce(function(a,b){ return a+b; }, 0) / minutes.length)
+    : 0;
+
+  var st = DB.stats[sid] || {};
+
+  return {
+    student: s,
+    monday: monday,
+    lastDay: days.length ? days[days.length-1] : monday,
+    totalDays: total,      // 운영일 (분모)
+    present: present,      // 출석일
+    rate: rate,            // 출석률 %
+    grade: gradeOf(rate),  // 등급
+    streak: liveStreak(sid),
+    bestStreak: st.longestStreak || 0,
+    avgMinutes: avgMin,
+    noCheckout: noCheckout
+  };
+}
