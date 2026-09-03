@@ -849,8 +849,49 @@ function showReportMessage(type, text){
   box.innerHTML = '<div class="ro-msg ' + type + '">' + text + '</div>';
 }
 
+// 집계 결과를 AI에게 넘길 텍스트로 변환한다.
+// 판정(등급)은 이미 끝난 상태로 넘긴다. AI는 문장만 쓴다.
+function buildReportData(st){
+  var lines = [
+    '학생 이름: ' + st.student.name,
+    '레벨: ' + (st.student.level || '미지정'),
+    '기간: ' + st.monday + ' ~ ' + st.lastDay + ' (운영 ' + st.totalDays + '일)',
+    '출석: ' + st.present + '일 / ' + st.totalDays + '일 (' + st.rate + '%)',
+    '연속 출석: ' + st.streak + '일 (최장 기록 ' + st.bestStreak + '일)',
+    '평균 체류 시간: ' + st.avgMinutes + '분',
+    '등급: ' + st.grade
+  ];
+  if(st.noCheckout > 0){
+    lines.push('하원 체크 누락: ' + st.noCheckout + '회');
+  }
+  return lines.join('\n');
+}
+
+// API 호출 (지침 9-2의 3분할 중 '호출' 담당)
+async function callReportApi(data, tone){
+  var res = await fetch('/api/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: data, tone: tone })
+  });
+  return await res.json();
+}
+
+// AI 결과를 화면에 표시 (지침 9-2의 3분할 중 '렌더링' 담당)
+function renderReportText(text){
+  var box = document.getElementById('reportOutput');
+  box.innerHTML = '<div class="ro-box">' + text + '</div>'
+    + '<button class="ro-copy" id="reportCopyBtn">복사하기</button>';
+
+  document.getElementById('reportCopyBtn').addEventListener('click', function(){
+    navigator.clipboard.writeText(text).then(function(){
+      showToast('✅ 리포트가 복사되었습니다.');
+    });
+  });
+}
+
 // 리포트 생성 버튼 클릭 시 실행
-function generateReport(){
+async function generateReport(){
   var input = collectReportInput();
   if(!input) return;                       // 검증 실패 시 여기서 중단
 
@@ -864,7 +905,30 @@ function generateReport(){
   }
 
   renderReportStats(st);
-  showReportMessage('info', '집계가 완료되었습니다. (AI 리포트 생성은 다음 단계에서 연결합니다)');
+
+  // 요청 중에는 버튼을 잠근다 (연타로 인한 중복 호출·과금 방지, 제약 C5)
+  var btn = document.getElementById('reportBtn');
+  btn.disabled = true;
+  btn.textContent = '작성 중...';
+  showReportMessage('info', 'AI가 리포트를 작성하고 있습니다. 잠시만 기다려 주세요.');
+
+  try {
+    var result = await callReportApi(buildReportData(st), input.tone);
+    if(result.ok){
+      renderReportText(result.text);
+    } else {
+      // 백엔드가 보내준 사용자용 문구를 그대로 표시한다
+      showReportMessage('error', result.error || '리포트를 생성하지 못했습니다.');
+    }
+  } catch (e) {
+    // 네트워크 자체가 끊긴 경우 (오프라인 등)
+    console.error('리포트 요청 실패:', e);
+    showReportMessage('error', '연결에 실패했습니다. 네트워크 상태를 확인해 주세요.');
+  } finally {
+    // 성공하든 실패하든 버튼은 반드시 원래대로 되돌린다
+    btn.disabled = false;
+    btn.textContent = '리포트 생성';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function(){
