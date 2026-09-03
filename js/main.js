@@ -158,6 +158,7 @@ function goTab(n){
   }
   if(n==='students') renderStudents();
   if(n==='settings') loadSettings();
+  if(n==='report') fillStudentSelect();
 }
 
 // ===== 출결 입력 처리 =====
@@ -756,3 +757,141 @@ function weeklyStats(sid, baseDate){
     noCheckout: noCheckout
   };
 }
+
+// ===== 주간 리포트 화면 =====
+// 지침 9-2에 따라 역할을 나눈다.
+//   collectReportInput  입력 수집·검증
+//   renderReportStats   집계 결과 렌더링
+//   (다음 단계에서 API 호출 함수 추가)
+
+var reportTone = 'parent';   // 현재 선택된 톤
+
+// 리포트 화면 진입 시 입력칸 초기화
+function fillStudentSelect(){
+  var input = document.getElementById('reportCode');
+  if(!input) return;
+  input.value = '';
+  updateReportName();
+  setTimeout(function(){ input.focus(); }, 100);
+}
+
+// 입력된 번호로 학생을 찾는다 (없으면 null)
+function findStudentByCode(){
+  var input = document.getElementById('reportCode');
+  var no = (input.value || '').trim();
+  if(no.length !== 2) return null;
+  return DB.students.find(function(s){ return s.no === no; }) || null;
+}
+
+// 입력에 따라 학생 이름을 실시간 표시
+function updateReportName(){
+  var el = document.getElementById('reportName');
+  var input = document.getElementById('reportCode');
+  var no = (input.value || '').trim();
+
+  if(!no){
+    el.textContent = '번호를 입력하세요';
+    el.className = 'rc-name';
+    return;
+  }
+  var s = findStudentByCode();
+  if(s){
+    el.textContent = s.name + (s.level ? ' (' + s.level + ')' : '');
+    el.className = 'rc-name found';
+  } else if(no.length === 2){
+    el.textContent = '등록되지 않은 번호입니다';
+    el.className = 'rc-name notfound';
+  } else {
+    el.textContent = '두 자리를 입력하세요';
+    el.className = 'rc-name';
+  }
+}
+
+// 입력 수집 + 검증 (S1 정의서 F-5)
+function collectReportInput(){
+  var input = document.getElementById('reportCode');
+  var no = (input.value || '').trim();
+
+  if(!no){
+    showReportMessage('error', '학생 번호를 입력해 주세요.');
+    return null;
+  }
+  var s = findStudentByCode();
+  if(!s){
+    showReportMessage('error', '등록되지 않은 번호입니다. 다시 한 번 확인해주세요.');
+    return null;
+  }
+  return { sid: s.id, tone: reportTone };
+}
+
+// 집계 결과를 카드로 표시
+function renderReportStats(st){
+  var box = document.getElementById('reportStats');
+  var period = st.monday + ' ~ ' + st.lastDay;
+
+  box.innerHTML =
+      '<div class="rs-card"><div class="rs-num">' + st.present + ' / ' + st.totalDays + '</div>'
+    + '<div class="rs-label">출석 / 운영일</div></div>'
+    + '<div class="rs-card"><div class="rs-num">' + st.rate + '%</div>'
+    + '<div class="rs-label">출석률</div></div>'
+    + '<div class="rs-card"><div class="rs-num">' + st.streak + '</div>'
+    + '<div class="rs-label">연속 출석(일)</div></div>'
+    + '<div class="rs-card"><div class="rs-num">' + st.avgMinutes + '</div>'
+    + '<div class="rs-label">평균 체류(분)</div></div>'
+    + '<div class="rs-grade grade-' + st.grade + '">'
+    + '판정: ' + st.grade + ' <span style="font-weight:400;font-size:13px;">(' + period + ')</span>'
+    + '</div>';
+}
+
+// 출력 영역에 안내 메시지 표시
+function showReportMessage(type, text){
+  var box = document.getElementById('reportOutput');
+  box.innerHTML = '<div class="ro-msg ' + type + '">' + text + '</div>';
+}
+
+// 리포트 생성 버튼 클릭 시 실행
+function generateReport(){
+  var input = collectReportInput();
+  if(!input) return;                       // 검증 실패 시 여기서 중단
+
+  var st = weeklyStats(input.sid);
+
+  // 이번 주 출결 기록이 0건이면 API를 호출하지 않는다 (S1 정의서 F-1)
+  if(st.present === 0){
+    document.getElementById('reportStats').innerHTML = '';
+    showReportMessage('error', '이번 주 출결 기록이 없습니다. 출결 현황 기록을 확인해주세요.');
+    return;
+  }
+
+  renderReportStats(st);
+  showReportMessage('info', '집계가 완료되었습니다. (AI 리포트 생성은 다음 단계에서 연결합니다)');
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  // 톤 선택 버튼
+  var toneBtns = document.querySelectorAll('.tone-btn');
+  toneBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      toneBtns.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      reportTone = btn.getAttribute('data-tone');
+    });
+  });
+
+  // 생성 버튼
+  var btn = document.getElementById('reportBtn');
+  if(btn) btn.addEventListener('click', generateReport);
+
+  // 번호 입력 — 숫자만 허용하고 이름을 실시간 표시
+  var codeInput = document.getElementById('reportCode');
+  if(codeInput){
+    codeInput.addEventListener('input', function(){
+      this.value = this.value.replace(/\D/g, '').slice(0, 2);
+      updateReportName();
+    });
+    // Enter로도 생성 가능 (출결 데스크와 동일한 조작감)
+    codeInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter') generateReport();
+    });
+  }
+});
