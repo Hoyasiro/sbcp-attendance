@@ -766,12 +766,81 @@ function weeklyStats(sid, baseDate){
 
 var reportTone = 'parent';   // 현재 선택된 톤
 
+// ===== 리포트 캐시 (2단 구조) =====
+// 같은 학생·같은 집계값·같은 톤이면 AI에게 물어볼 내용이 똑같다.
+// 이미 받아 둔 문장을 재사용해 불필요한 API 호출을 막는다 (제약 C5).
+//
+//   1단 메모리       — 가장 빠름. 새로고침하면 사라짐
+//   2단 localStorage — 브라우저를 껐다 켜도 남음
+//
+// 앱 시작 시 2단을 1단으로 올려 두므로, 조회할 때는 메모리만 보면 된다.
+
+var REPORT_CACHE_KEY = 'acad-report-cache';   // localStorage에 쓰는 이름
+var reportCache = {};                          // 1단 (메모리)
+
+// 캐시를 찾을 때 쓰는 열쇠를 만든다.
+// 집계값이 하나라도 바뀌면 열쇠가 달라져 새로 호출된다.
+function reportCacheKey(st, tone){
+  return [
+    st.student.id, st.monday, st.present, st.totalDays,
+    st.streak, st.avgMinutes, st.grade, tone
+  ].join('|');
+}
+
+// 2단에서 꺼내온다. 저장된 것이 없거나 형식이 깨졌으면 빈 객체를 준다.
+function loadReportCache(){
+  try {
+    var raw = localStorage.getItem(REPORT_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e){
+    return {};   // 실패해도 서비스는 계속 돌아가야 한다. 캐시는 있으면 좋은 것일 뿐
+  }
+}
+
+// 양쪽에 저장한다.
+// 집계값이 바뀌면 이전 리포트는 더 이상 쓸모가 없으므로,
+// 같은 학생·같은 톤의 헌 항목은 지우고 최신 1개만 남긴다.
+function saveReportCache(key, text){
+  // 열쇠는 "학생ID|월요일|출석|운영일|연속|평균체류|등급|톤" 형태다.
+  // 맨 앞의 학생ID와 맨 뒤의 톤이 같으면 같은 조합으로 본다.
+  var parts = key.split('|');
+  var sid   = parts[0];
+  var tone  = parts[parts.length - 1];
+  var isSameCombo = function(k){
+    var p = k.split('|');
+    return p[0] === sid && p[p.length - 1] === tone;
+  };
+
+  // 1단 — 헌 항목을 지우고 새것을 넣는다
+  Object.keys(reportCache).forEach(function(k){
+    if(isSameCombo(k)) delete reportCache[k];
+  });
+  reportCache[key] = text;
+
+  // 2단 — 같은 방식으로 정리 후 저장
+  try {
+    var stored = loadReportCache();
+    Object.keys(stored).forEach(function(k){
+      if(isSameCombo(k)) delete stored[k];
+    });
+    stored[key] = text;
+    localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(stored));
+  } catch(e){
+    // 용량 초과 등으로 실패해도 무시한다. 1단 메모리는 이미 저장됐다
+    console.warn('리포트 캐시 저장 실패:', e);
+  }
+}
+
+// 앱이 켜질 때 2단 내용을 1단으로 미리 올려 둔다
+reportCache = loadReportCache();
+
 // 리포트 화면 진입 시 입력칸 초기화
 function fillStudentSelect(){
   var input = document.getElementById('reportCode');
   if(!input) return;
   input.value = '';
   updateReportName();
+  refreshReportStats();   // 탭에 다시 들어왔을 때 이전 학생의 카드·리포트를 지운다
   setTimeout(function(){ input.focus(); }, 100);
 }
 
@@ -843,6 +912,31 @@ function renderReportStats(st){
     + '</div>';
 }
 
+// 입력된 번호에 맞춰 카드를 다시 그린다.
+// 규칙: 카드는 항상 "지금 입력창에 있는 번호"의 것이어야 한다.
+// 유효하지 않은 번호면 카드도 리포트도 남기지 않는다.
+function refreshReportStats(){
+  var statsBox = document.getElementById('reportStats');
+  var outBox   = document.getElementById('reportOutput');
+  var btn      = document.getElementById('reportBtn');
+  if(!statsBox || !outBox) return;
+
+  // 번호가 바뀌는 순간 이전 학생의 결과는 무조건 지운다
+  statsBox.innerHTML = '';
+  outBox.innerHTML   = '';
+
+  var s = findStudentByCode();
+  if(!s){
+    // 유효한 번호가 아니면 생성 버튼도 숨긴다.
+    // 누를 수 없는 버튼을 보여 주는 것보다 안 보이는 편이 덜 헷갈린다.
+    if(btn) btn.style.display = 'none';
+    return;
+  }
+
+  if(btn) btn.style.display = '';   // 기본값으로 되돌려 다시 보이게 한다
+  renderReportStats(weeklyStats(s.id));
+}
+
 // 출력 영역에 안내 메시지 표시
 function showReportMessage(type, text){
   var box = document.getElementById('reportOutput');
@@ -896,25 +990,36 @@ async function generateReport(){
   if(!input) return;                       // 검증 실패 시 여기서 중단
 
   var st = weeklyStats(input.sid);
+  renderReportStats(st);                   // 카드는 항상 지금 입력된 번호의 것으로 맞춘다
 
   // 이번 주 출결 기록이 0건이면 API를 호출하지 않는다 (S1 정의서 F-1)
+  // 카드(0/5, 0%)는 그대로 두고 안내 문구만 띄운다
   if(st.present === 0){
-    document.getElementById('reportStats').innerHTML = '';
     showReportMessage('error', '이번 주 출결 기록이 없습니다. 출결 현황 기록을 확인해주세요.');
     return;
   }
 
-  renderReportStats(st);
+    // 이미 같은 조건으로 받아 둔 리포트가 있으면 API를 부르지 않는다 (제약 C5)
+  var cacheKey = reportCacheKey(st, input.tone);
+  if(reportCache[cacheKey]){
+    renderReportText(reportCache[cacheKey]);
+    showToast('이전에 생성한 리포트입니다.');
+    return;
+  }
 
-  // 요청 중에는 버튼을 잠근다 (연타로 인한 중복 호출·과금 방지, 제약 C5)
-  var btn = document.getElementById('reportBtn');
-  btn.disabled = true;
+  // 요청 중에는 버튼과 입력칸을 함께 잠근다
+  // (연타로 인한 중복 호출·과금 방지, 제약 C5 / 대기 중 번호 변경 방지)
+  var btn  = document.getElementById('reportBtn');
+  var code = document.getElementById('reportCode');
+  btn.disabled  = true;
+  code.disabled = true;
   btn.textContent = '작성 중...';
   showReportMessage('info', 'AI가 리포트를 작성하고 있습니다. 잠시만 기다려 주세요.');
 
   try {
     var result = await callReportApi(buildReportData(st), input.tone);
     if(result.ok){
+      saveReportCache(cacheKey, result.text);   // 메모리 + localStorage 양쪽에 저장
       renderReportText(result.text);
     } else {
       // 백엔드가 보내준 사용자용 문구를 그대로 표시한다
@@ -925,8 +1030,9 @@ async function generateReport(){
     console.error('리포트 요청 실패:', e);
     showReportMessage('error', '연결에 실패했습니다. 네트워크 상태를 확인해 주세요.');
   } finally {
-    // 성공하든 실패하든 버튼은 반드시 원래대로 되돌린다
-    btn.disabled = false;
+    // 성공하든 실패하든 버튼·입력칸은 반드시 원래대로 되돌린다
+    btn.disabled  = false;
+    code.disabled = false;
     btn.textContent = '리포트 생성';
   }
 }
@@ -946,16 +1052,13 @@ document.addEventListener('DOMContentLoaded', function(){
   var btn = document.getElementById('reportBtn');
   if(btn) btn.addEventListener('click', generateReport);
 
-  // 번호 입력 — 숫자만 허용하고 이름을 실시간 표시
+  // 번호 입력 — 숫자만 허용하고 이름·집계 카드를 실시간 갱신
   var codeInput = document.getElementById('reportCode');
   if(codeInput){
     codeInput.addEventListener('input', function(){
       this.value = this.value.replace(/\D/g, '').slice(0, 2);
       updateReportName();
-    });
-    // Enter로도 생성 가능 (출결 데스크와 동일한 조작감)
-    codeInput.addEventListener('keydown', function(e){
-      if(e.key === 'Enter') generateReport();
+      refreshReportStats();   // ← 카드도 이름과 같은 타이밍에 갱신
     });
   }
 });
