@@ -6,6 +6,8 @@
 
 **GitHub** — https://github.com/Hoyasiro/sbcp-attendance
 
+**서비스 기획서** — [docs/서비스기획서.md](docs/서비스기획서.md)
+
 ---
 
 ## 1. 서비스 소개
