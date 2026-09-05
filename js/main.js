@@ -158,7 +158,8 @@ function goTab(n){
   }
   if(n==='students') renderStudents();
   if(n==='settings') loadSettings();
-  if(n==='report') fillStudentSelect();
+  if(n==='data') renderReportHistory('dataHistoryList', 50);
+  if(n==='report'){ fillStudentSelect(); renderReportHistory('reportHistoryList', 5); }
 }
 
 // ===== 출결 입력 처리 =====
@@ -702,6 +703,13 @@ document.addEventListener('DOMContentLoaded', function(){
   var fixedBtn = document.getElementById('holidayFixedBtn');
   if(fixedBtn) fixedBtn.addEventListener('click', addFixedHolidays);
 
+  // 리포트 이력 버튼
+  var histDl = document.getElementById('histDlBtn');
+  if(histDl) histDl.addEventListener('click', dlReportHistory);
+
+  var histClear = document.getElementById('histClearBtn');
+  if(histClear) histClear.addEventListener('click', clearReportHistory);
+
   // 삭제 버튼은 목록이 다시 그려질 때마다 새로 생기므로
   // 부모 요소에 한 번만 걸고 클릭 대상을 확인하는 방식으로 처리한다
   var list = document.getElementById('holidayList');
@@ -867,6 +875,131 @@ function saveReportCache(key, text){
 
 // 앱이 켜질 때 2단 내용을 1단으로 미리 올려 둔다
 reportCache = loadReportCache();
+
+// ===== 리포트 발송 이력 =====
+// 캐시와 목적이 다르므로 저장소를 분리한다.
+//   캐시 — 같은 조건이면 재사용. 조합당 1건만 유지(덮어씀)
+//   이력 — 언제 무엇을 만들었는지의 기록. 누적(지우지 않음)
+// 캐시 기준으로 이력을 관리하면 기록이 사라지므로 함께 둘 수 없다.
+
+var REPORT_HISTORY_KEY = 'acad-report-history';
+
+// 보관 상한. 넘으면 오래된 것부터 자동으로 밀려난다.
+// 학생 40명 기준 주당 약 40건이 쌓이므로 1000건이면 약 6개월치다.
+// 항목당 700바이트 남짓이라 전체 0.7MB 수준이며, 출결 데이터와 함께 써도 여유가 있다.
+var REPORT_HISTORY_MAX = 1000;
+
+var TONE_LABEL = { parent:'학부모 발송용', student:'학생 열람용' };
+
+function loadReportHistory(){
+  try {
+    var raw = localStorage.getItem(REPORT_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e){
+    return [];   // 읽기에 실패해도 서비스는 계속 동작해야 한다
+  }
+}
+
+// 생성에 성공한 리포트만 이력에 남긴다
+function addReportHistory(st, tone, text){
+  var list = loadReportHistory();
+  var d = new Date();
+
+  list.unshift({                       // 최신이 위로 오도록 맨 앞에 넣는다
+    at: fmtDate(d) + ' ' + nowT(),
+    no: st.student.no,
+    name: st.student.name,
+    tone: tone,
+    grade: st.grade,
+    rate: st.rate,
+    present: st.present,
+    totalDays: st.totalDays,
+    period: st.monday + ' ~ ' + st.lastDay,
+    text: text
+  });
+
+  // 최신순으로 정렬돼 있으므로 앞에서 잘라내면 오래된 것이 빠진다
+  var removed = 0;
+  if(list.length > REPORT_HISTORY_MAX){
+    removed = list.length - REPORT_HISTORY_MAX;
+    list = list.slice(0, REPORT_HISTORY_MAX);
+  }
+
+  try {
+    localStorage.setItem(REPORT_HISTORY_KEY, JSON.stringify(list));
+  } catch(e){
+    // 상한을 두었어도 용량 한도에 걸릴 수 있다.
+    // 조용히 넘어가면 원장이 이유를 알 수 없으므로 알린다.
+    console.warn('리포트 이력 저장 실패:', e);
+    showToast('⚠️ 저장 공간이 부족해 이력을 남기지 못했습니다.');
+    return;
+  }
+
+  if(removed > 0){
+    showToast('오래된 리포트 ' + removed + '건이 목록에서 제외되었습니다.');
+  }
+  renderReportHistoryAll();
+}
+
+function clearReportHistory(){
+  if(!confirm('리포트 발송 이력을 모두 삭제하시겠습니까?\n생성된 리포트 기록이 사라집니다.')) return;
+  try { localStorage.removeItem(REPORT_HISTORY_KEY); } catch(e){}
+  renderReportHistoryAll();
+  showToast('리포트 이력이 삭제되었습니다.');
+}
+
+// limit이 0이면 전체를 그린다
+function renderReportHistory(boxId, limit){
+  var box = document.getElementById(boxId);
+  if(!box) return;
+
+  var list = loadReportHistory();
+  if(!list.length){
+    box.innerHTML = '<div class="hist-empty">아직 생성한 리포트가 없습니다.</div>';
+    return;
+  }
+
+  var shown = limit ? list.slice(0, limit) : list;
+  box.innerHTML = shown.map(function(h){
+    return '<div class="hist-item">'
+      + '<div class="hist-head">'
+      +   '<div class="hist-meta">'
+      +     '<span class="hist-name">' + h.no + ' ' + h.name + '</span>'
+      +     '<span class="hist-badge grade-' + h.grade + '">' + h.grade + '</span>'
+      +     '<span class="hist-tone">' + (TONE_LABEL[h.tone] || h.tone) + '</span>'
+      +   '</div>'
+      +   '<span class="hist-at">' + h.at + '</span>'
+      + '</div>'
+      + '<div class="hist-body">' + h.text + '</div>'
+      + '</div>';
+  }).join('');
+
+  // 항목이 다시 그려질 때마다 새로 생기므로 부모에 한 번만 건다
+  box.onclick = function(e){
+    var head = e.target.closest('.hist-head');
+    if(head) head.parentNode.classList.toggle('open');
+  };
+}
+
+// 두 화면에 같은 이력이 표시되므로 함께 갱신한다
+function renderReportHistoryAll(){
+  renderReportHistory('reportHistoryList', 5);    // 리포트 화면 — 최근 5건
+  renderReportHistory('dataHistoryList', 50);     // 데이터 관리 — 최근 50건
+}
+
+// 이력을 CSV로 내보낸다 (화면 표시 제한과 무관하게 전부 내보냄)
+function dlReportHistory(){
+  var list = loadReportHistory();
+  if(!list.length){ showToast('내보낼 리포트 이력이 없습니다.'); return; }
+
+  var rows = [['생성일시','등록번호','이름','톤','기간','출석','운영일','출석률(%)','등급','리포트']];
+  list.forEach(function(h){
+    rows.push([h.at, h.no, h.name, TONE_LABEL[h.tone] || h.tone,
+               h.period, h.present, h.totalDays, h.rate, h.grade, h.text]);
+  });
+  csvDL('리포트이력.csv', rows);
+  showToast('📥 리포트 이력 다운로드 완료');
+}
 
 // 리포트 화면 진입 시 입력칸 초기화
 function fillStudentSelect(){
@@ -1053,7 +1186,8 @@ async function generateReport(){
   try {
     var result = await callReportApi(buildReportData(st), input.tone);
     if(result.ok){
-      saveReportCache(cacheKey, result.text);   // 메모리 + localStorage 양쪽에 저장
+      saveReportCache(cacheKey, result.text);            // 재사용용 (조합당 1건)
+      addReportHistory(st, input.tone, result.text);     // 기록용 (누적)
       renderReportText(result.text);
     } else {
       // 백엔드가 보내준 사용자용 문구를 그대로 표시한다
@@ -1093,6 +1227,10 @@ document.addEventListener('DOMContentLoaded', function(){
       this.value = this.value.replace(/\D/g, '').slice(0, 2);
       updateReportName();
       refreshReportStats();   // ← 카드도 이름과 같은 타이밍에 갱신
+    });
+    // Enter로도 생성 가능 (출결 데스크와 동일한 조작감)
+    codeInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter') generateReport();
     });
   }
 });

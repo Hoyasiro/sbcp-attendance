@@ -164,6 +164,21 @@
               </div>
             </div>
           </div>
+
+          <div class="data-section hist-section">
+            <div class="data-section-title">📝 리포트 발송 이력</div>
+            <p class="holiday-desc">
+              AI가 생성한 리포트가 순서대로 기록됩니다. 항목을 누르면 전문을 볼 수 있습니다.<br>
+              최근 <b>1,000건</b>까지 보관되며, 초과분은 오래된 것부터 자동으로 제외됩니다.
+              화면에는 최근 50건만 표시되며, 전체 기록은 CSV로 내보낼 수 있습니다.
+            </p>
+            <div class="hist-actions">
+              <button class="holiday-btn" id="histDlBtn">CSV 내보내기</button>
+              <button class="hist-clear" id="histClearBtn">전체 삭제</button>
+            </div>
+            <div class="hist-list" id="dataHistoryList"></div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -196,6 +211,11 @@
 
         <div class="report-stats" id="reportStats"></div>
         <div class="report-output" id="reportOutput"></div>
+
+        <div class="hist-recent">
+          <div class="hist-recent-title">최근 생성한 리포트</div>
+          <div class="hist-list" id="reportHistoryList"></div>
+        </div>
       </div>
     </div>
 

@@ -177,6 +177,9 @@ body::after { content:''; position:fixed; bottom:-150px; left:-150px; width:450p
 .upload-hint { font-size:12px; color:var(--text2); font-weight:400; margin-top:8px; line-height:1.5; }
 /* 설정 화면은 내용이 길어질 수 있으므로 세로 스크롤 허용 */
 #screen-settings .content-card { overflow-y:auto; }
+
+/* 리포트 화면도 이력 목록이 붙으면서 내용이 길어졌다 */
+#screen-report .content-card { overflow-y:auto; }
 /* 설정 */
 .set-group { background:var(--gray); border-radius:20px; padding:24px; border:1px solid var(--border); margin-bottom:24px; }
 .set-title { font-size:16px; font-weight:800; color:var(--navy); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
@@ -297,7 +300,7 @@ body::after { content:''; position:fixed; bottom:-150px; left:-150px; width:450p
 .grade-주의 { background:var(--pink-light); color:var(--pink); }
 
 /* AI 리포트 출력 */
-.report-output { flex:1; }
+.report-output { flex-shrink:0; }
 .ro-box { background:var(--surface); border:2px solid var(--border); border-radius:16px; padding:20px; font-size:15px; line-height:1.8; color:var(--text); white-space:pre-wrap; }
 .ro-msg { padding:20px; border-radius:16px; font-size:14px; font-weight:700; text-align:center; }
 .ro-msg.info { background:var(--gray); color:var(--text2); }
@@ -464,3 +467,37 @@ body, .content-card, .list-container, .input-area,
   cursor:pointer; transition:all .2s;
 }
 .theme-btn:hover { border-color:var(--pink); color:var(--pink); }
+
+/* ================= 리포트 발송 이력 ================= */
+/* 색은 모두 변수를 쓰므로 다크 모드가 자동으로 따라온다 */
+
+.hist-section { grid-column:1/-1; }
+.hist-actions { display:flex; gap:8px; margin-bottom:14px; }
+.hist-clear { padding:12px 20px; border:2px solid var(--border); border-radius:12px; background:transparent; color:var(--text2); font-size:14px; font-weight:700; font-family:'Noto Sans KR',sans-serif; cursor:pointer; white-space:nowrap; }
+.hist-clear:hover { border-color:var(--pink); color:var(--pink); }
+
+.hist-list { display:flex; flex-direction:column; gap:8px; }
+.hist-item { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.hist-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; cursor:pointer; transition:background .2s; }
+.hist-head:hover { background:var(--gray); }
+.hist-meta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0; }
+.hist-name { font-size:15px; font-weight:700; color:var(--navy); }
+.hist-badge { font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px; }
+.hist-tone { font-size:12px; color:var(--text2); font-weight:700; }
+.hist-at { font-size:12px; color:var(--text2); font-family:'Outfit',sans-serif; white-space:nowrap; }
+
+/* 전문은 접어 두고, 항목을 누르면 펼친다 */
+.hist-body { display:none; padding:14px 16px 16px; font-size:14px; line-height:1.8; color:var(--text); white-space:pre-wrap; border-top:1px solid var(--border); }
+.hist-item.open .hist-body { display:block; }
+.hist-empty { font-size:13px; color:var(--text2); text-align:center; padding:24px 0; }
+
+/* 리포트 화면 하단 */
+.hist-recent { margin-top:28px; }
+.hist-recent-title { font-size:15px; font-weight:800; color:var(--navy); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.hist-recent-title::before { content:''; width:4px; height:16px; border-radius:2px; background:var(--pink); display:block; }
+
+@media (max-width: 768px) {
+  .hist-head { flex-direction:column; align-items:flex-start; gap:8px; }
+  .hist-actions { flex-direction:column; }
+  .hist-clear, .hist-actions .holiday-btn { width:100%; }
+}
