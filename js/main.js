@@ -546,6 +546,40 @@ function saveSettings(){
   save();showToast('✅ 설정이 저장되었습니다.');
 }
 
+// ===== 화면 테마 (다크 모드) =====
+// CSS 변수만 덮어쓰는 방식이라 JS는 body에 클래스를 붙였다 떼기만 한다.
+// 선택은 localStorage에 저장해 다시 접속해도 유지된다.
+
+var THEME_KEY = 'acad-theme';
+
+function applyTheme(dark){
+  document.body.classList.toggle('dark', dark);
+  var btn = document.getElementById('themeBtn');
+  if(btn) btn.textContent = dark ? '☀️ 라이트 모드로 전환' : '🌙 다크 모드로 전환';
+}
+
+function loadTheme(){
+  var saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch(e){}
+  applyTheme(saved === 'dark');
+}
+
+function toggleTheme(){
+  var dark = !document.body.classList.contains('dark');
+  try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch(e){}
+  applyTheme(dark);
+  showToast(dark ? '🌙 다크 모드로 전환했습니다.' : '☀️ 라이트 모드로 전환했습니다.');
+}
+
+// 스크립트가 body 끝에서 실행되므로 여기서 바로 적용한다.
+// DOMContentLoaded를 기다리면 밝은 화면이 잠깐 보였다가 어두워진다.
+loadTheme();
+
+document.addEventListener('DOMContentLoaded', function(){
+  var tBtn = document.getElementById('themeBtn');
+  if(tBtn) tBtn.addEventListener('click', toggleTheme);
+});
+
 // ===== 토스트 & Undo =====
 var _tt;
 function showToast(m){

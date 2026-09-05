@@ -59,7 +59,7 @@
             </div>
           </div>
           <div class="input-center">
-            <input type="text" class="num-input" id="numInput" placeholder="00" maxlength="2" inputmode="numeric" autocomplete="off" autofocus>
+            <input type="text" class="num-input" id="numInput" placeholder="00" maxlength="2" inputmode="numeric" autocomplete="off">
             <div class="input-hint">두 자리 입력 시 자동 처리 (Enter 지원)</div>
           </div>
           <div class="result-wrapper">
@@ -207,12 +207,6 @@
         </div>
       </div>
       <div class="content-card" style="align-items:flex-start;">
-        <div class="set-group" style="width:100%; max-width:500px;">
-          <div class="set-title">🏫 학원 정보</div>
-          <div class="frow"><label>학원명</label><input type="text" id="cfgName" placeholder="삼성영어 셀레나"></div>
-          <div class="frow"><label>원장 연락처</label><input type="text" id="cfgPhone" placeholder="010-0000-0000" inputmode="numeric" maxlength="13" oninput="fmtPhone(this)"></div>
-        </div>
-        
         <div class="set-group" style="width:100%; max-width:500px; padding:16px 24px;">
           <div class="set-title" style="margin-bottom:8px;">🔥 연속 출결 기준 안내</div>
           <div style="font-size:13px; color:var(--text2); line-height:1.6;">
@@ -220,7 +214,15 @@
             예) 금요일 출석 후 다음 월요일에 출석하면 연속 출석 유지.
           </div>
         </div>
-        
+
+        <div class="set-group" style="width:100%; max-width:500px;">
+          <div class="set-title">🎨 화면 테마</div>
+          <p class="holiday-desc">
+            어두운 환경에서 눈의 피로를 줄이려면 다크 모드를 사용하세요. 선택한 테마는 저장됩니다.
+          </p>
+          <button class="theme-btn" id="themeBtn">🌙 다크 모드로 전환</button>
+        </div>
+
         <div class="set-group" style="width:100%; max-width:500px;">
           <div class="set-title">📅 휴원일 관리</div>
           <p class="holiday-desc">
